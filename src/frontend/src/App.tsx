@@ -34,7 +34,7 @@ export default function App() {
   const [yearFilter, setYearFilter] = useState("");
 
   // Admin
-  const { isAdmin, permissions, logout, setPermission } = useAdmin();
+  const { isAdmin, permissions, login, logout, setPermission } = useAdmin();
   const [adminLoginOpen, setAdminLoginOpen] = useState(false);
 
   // Modals
@@ -304,6 +304,7 @@ export default function App() {
       <AdminLoginModal
         open={adminLoginOpen}
         onClose={() => setAdminLoginOpen(false)}
+        onLogin={login}
       />
 
       <Toaster richColors position="bottom-right" />

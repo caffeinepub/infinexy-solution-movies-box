@@ -3,15 +3,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { useState } from "react";
-import { useAdmin } from "../hooks/useAdmin";
 
 interface AdminLoginModalProps {
   open: boolean;
   onClose: () => void;
+  onLogin: (username: string, password: string) => boolean;
 }
 
-export function AdminLoginModal({ open, onClose }: AdminLoginModalProps) {
-  const { login } = useAdmin();
+export function AdminLoginModal({
+  open,
+  onClose,
+  onLogin,
+}: AdminLoginModalProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -25,7 +28,7 @@ export function AdminLoginModal({ open, onClose }: AdminLoginModalProps) {
     setError("");
     setIsLoading(true);
     await new Promise((r) => setTimeout(r, 400));
-    const success = login(username, password);
+    const success = onLogin(username, password);
     setIsLoading(false);
     if (success) {
       setUsername("");
