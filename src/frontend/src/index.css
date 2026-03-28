@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("/assets/fonts/PlusJakartaSans.woff2") format("woff2");
+  font-weight: 300 700;
+  font-display: swap;
+}
+
+@layer base {
+  :root {
+    --radius: 0.5rem;
+    /* Cinema dark theme - OKLCH */
+    --background: 0.14 0.03 240;
+    --foreground: 0.93 0.01 245;
+    --card: 0.19 0.04 240;
+    --card-foreground: 0.93 0.01 245;
+    --popover: 0.22 0.05 240;
+    --popover-foreground: 0.93 0.01 245;
+    --primary: 0.75 0.12 82;
+    --primary-foreground: 0.14 0.03 240;
+    --secondary: 0.22 0.05 240;
+    --secondary-foreground: 0.93 0.01 245;
+    --muted: 0.22 0.05 240;
+    --muted-foreground: 0.6 0.03 245;
+    --accent: 0.28 0.06 240;
+    --accent-foreground: 0.93 0.01 245;
+    --destructive: 0.47 0.17 25;
+    --destructive-foreground: 0.93 0.01 245;
+    --border: 0.28 0.04 240;
+    --input: 0.18 0.04 240;
+    --ring: 0.75 0.12 82;
+    --chart-1: 0.75 0.12 82;
+    --chart-2: 0.47 0.17 25;
+    --chart-3: 0.6 0.15 200;
+    --chart-4: 0.7 0.1 140;
+    --chart-5: 0.65 0.15 280;
+    --sidebar: 0.13 0.03 240;
+    --sidebar-foreground: 0.93 0.01 245;
+    --sidebar-primary: 0.75 0.12 82;
+    --sidebar-primary-foreground: 0.14 0.03 240;
+    --sidebar-accent: 0.19 0.04 240;
+    --sidebar-accent-foreground: 0.93 0.01 245;
+    --sidebar-border: 0.28 0.04 240;
+    --sidebar-ring: 0.75 0.12 82;
+    /* Custom cinema vars */
+    --gold: #d2b04c;
+    --gold-hover: #c6a13e;
+    --red: #b53a3a;
+    --red-hover: #9e2f2f;
+    --surface: #121f33;
+    --surface-2: #162742;
+    --sidebar-bg: #0a1424;
+    --border-color: #22324a;
+    --border-input: #263a55;
+    --text-primary: #e8eef7;
+    --text-secondary: #aab6c6;
+    --text-muted: #7f8ca3;
+    --input-bg: #111e31;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+    background: linear-gradient(135deg, #0b1220 0%, #0e1a2b 100%);
+    min-height: 100vh;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #0a1424;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #263a55;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #d2b04c;
+  }
+}
