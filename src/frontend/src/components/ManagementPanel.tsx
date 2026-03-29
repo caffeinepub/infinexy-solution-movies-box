@@ -21,9 +21,8 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { useDeleteFolder } from "../hooks/useFolders";
 import { useDeleteMovie } from "../hooks/useMovies";
-import { CATEGORY_COLORS, type Folder, type Movie } from "../types";
+import { CATEGORY_COLORS, type Movie } from "../types";
 
 interface Permissions {
   allowView: boolean;
@@ -32,38 +31,26 @@ interface Permissions {
 
 interface ManagementPanelProps {
   movies: Movie[];
-  folders: Folder[];
   isLoading: boolean;
   onEditMovie: (movie: Movie) => void;
   onAddMovie: () => void;
-  onRenameFolder: (folder: Folder) => void;
-  onAddFolder: () => void;
   permissions: Permissions;
   onSetPermission: (key: "allowView" | "allowDownload", val: boolean) => void;
 }
 
 export function ManagementPanel({
   movies,
-  folders,
   isLoading,
   onEditMovie,
   onAddMovie,
-  onRenameFolder,
-  onAddFolder,
   permissions,
   onSetPermission,
 }: ManagementPanelProps) {
   const [movieSearch, setMovieSearch] = useState("");
-  const [folderSearch, setFolderSearch] = useState("");
   const deleteMovie = useDeleteMovie();
-  const deleteFolder = useDeleteFolder();
 
   const filteredMovies = movies.filter((m) =>
     m.title.toLowerCase().includes(movieSearch.toLowerCase()),
-  );
-
-  const filteredFolders = folders.filter((f) =>
-    f.name.toLowerCase().includes(folderSearch.toLowerCase()),
   );
 
   const handleDeleteMovie = async (movie: Movie) => {
@@ -71,26 +58,12 @@ export function ManagementPanel({
     try {
       await deleteMovie.mutateAsync(movie.id);
       toast.success("Movie deleted");
-    } catch {
-      toast.error("Failed to delete movie");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to delete movie",
+      );
     }
   };
-
-  const handleDeleteFolder = async (folder: Folder) => {
-    if (!confirm(`Delete folder "${folder.name}"? Movies will be unassigned.`))
-      return;
-    try {
-      await deleteFolder.mutateAsync(folder.id);
-      toast.success("Folder deleted");
-    } catch {
-      toast.error("Failed to delete folder");
-    }
-  };
-
-  const movieCountByFolder = (folderId: bigint) =>
-    movies.filter(
-      (m) => m.folderId && m.folderId.length > 0 && m.folderId[0] === folderId,
-    ).length;
 
   const surfaceStyle = { background: "#121F33", border: "1px solid #22324A" };
   const inputStyle = {
@@ -115,13 +88,6 @@ export function ManagementPanel({
             data-ocid="manage.movies.tab"
           >
             Movies ({movies.length})
-          </TabsTrigger>
-          <TabsTrigger
-            value="folders"
-            style={{ color: "#AAB6C6" }}
-            data-ocid="manage.folders.tab"
-          >
-            Folders ({folders.length})
           </TabsTrigger>
           <TabsTrigger
             value="settings"
@@ -257,111 +223,6 @@ export function ManagementPanel({
                               className="p-1.5 rounded transition-colors hover:bg-[#B53A3A]/20"
                               style={{ color: "#B53A3A" }}
                               data-ocid={`manage.movies.delete_button.${i + 1}`}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="folders" className="mt-4">
-          <div className="rounded-xl overflow-hidden" style={surfaceStyle}>
-            <div
-              className="flex items-center gap-3 p-4"
-              style={{ borderBottom: "1px solid #22324A" }}
-            >
-              <Input
-                placeholder="Search folders…"
-                value={folderSearch}
-                onChange={(e) => setFolderSearch(e.target.value)}
-                style={inputStyle}
-                className="max-w-xs"
-              />
-              <Button
-                onClick={onAddFolder}
-                className="ml-auto font-semibold"
-                style={{ background: "#D2B04C", color: "#0B1220" }}
-                data-ocid="manage.folders.primary_button"
-              >
-                <PlusCircle className="w-4 h-4 mr-1.5" /> New Folder
-              </Button>
-            </div>
-
-            {filteredFolders.length === 0 ? (
-              <div
-                className="text-center py-12"
-                data-ocid="manage.folders.empty_state"
-              >
-                <p className="text-lg" style={{ color: "#7F8CA3" }}>
-                  No folders found
-                </p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table data-ocid="manage.folders.table">
-                  <TableHeader>
-                    <TableRow style={{ borderColor: "#22324A" }}>
-                      <TableHead style={{ color: "#7F8CA3" }}>Name</TableHead>
-                      <TableHead style={{ color: "#7F8CA3" }}>
-                        Category
-                      </TableHead>
-                      <TableHead style={{ color: "#7F8CA3" }}>Movies</TableHead>
-                      <TableHead style={{ color: "#7F8CA3" }}>
-                        Actions
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredFolders.map((folder, i) => (
-                      <TableRow
-                        key={folder.id.toString()}
-                        style={{ borderColor: "#22324A" }}
-                        data-ocid={`manage.folders.row.${i + 1}`}
-                      >
-                        <TableCell
-                          className="font-semibold"
-                          style={{ color: "#E8EEF7" }}
-                        >
-                          {folder.name}
-                        </TableCell>
-                        <TableCell>
-                          <span
-                            className="px-2 py-0.5 rounded text-xs font-bold"
-                            style={{
-                              background: `${CATEGORY_COLORS[folder.category]}33`,
-                              color: CATEGORY_COLORS[folder.category],
-                            }}
-                          >
-                            {folder.category}
-                          </span>
-                        </TableCell>
-                        <TableCell style={{ color: "#AAB6C6" }}>
-                          {movieCountByFolder(folder.id)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => onRenameFolder(folder)}
-                              className="p-1.5 rounded transition-colors hover:bg-[#D2B04C]/20"
-                              style={{ color: "#D2B04C" }}
-                              data-ocid={`manage.folders.edit_button.${i + 1}`}
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteFolder(folder)}
-                              className="p-1.5 rounded transition-colors hover:bg-[#B53A3A]/20"
-                              style={{ color: "#B53A3A" }}
-                              data-ocid={`manage.folders.delete_button.${i + 1}`}
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>

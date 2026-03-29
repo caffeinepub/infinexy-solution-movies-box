@@ -7,8 +7,8 @@ import {
 } from "@/components/ui/select";
 import { Toaster } from "@/components/ui/sonner";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { AdminLoginModal } from "./components/AdminLoginModal";
-import { FolderModal } from "./components/FolderModal";
 import { Header } from "./components/Header";
 import { ManagementPanel } from "./components/ManagementPanel";
 import { MovieGrid } from "./components/MovieGrid";
@@ -16,15 +16,8 @@ import { Sidebar } from "./components/Sidebar";
 import { StatsPanel } from "./components/StatsPanel";
 import { UploadModal } from "./components/UploadModal";
 import { useAdmin } from "./hooks/useAdmin";
-import { useAllFolders } from "./hooks/useFolders";
-import { useAllMovies, useSeedMovies } from "./hooks/useMovies";
-import {
-  CATEGORIES,
-  type Category,
-  type Folder,
-  type Movie,
-  type NavView,
-} from "./types";
+import { useAllMovies, useDeleteMovie, useSeedMovies } from "./hooks/useMovies";
+import { CATEGORIES, type Category, type Movie, type NavView } from "./types";
 
 export default function App() {
   const [activeView, setActiveView] = useState<NavView>("all");
@@ -40,12 +33,10 @@ export default function App() {
   // Modals
   const [uploadOpen, setUploadOpen] = useState(false);
   const [editMovie, setEditMovie] = useState<Movie | null>(null);
-  const [folderOpen, setFolderOpen] = useState(false);
-  const [editFolder, setEditFolder] = useState<Folder | null>(null);
 
   const { data: movies = [], isLoading: moviesLoading } = useAllMovies();
-  const { data: folders = [], isLoading: foldersLoading } = useAllFolders();
   const seedMovies = useSeedMovies();
+  const deleteMovie = useDeleteMovie();
   const seededRef = useRef(false);
 
   // Seed on first load
@@ -85,21 +76,19 @@ export default function App() {
   }, []);
 
   const handleDeleteFromGrid = useCallback(
-    (movie: Movie) => {
-      handleEditMovie(movie);
+    async (movie: Movie) => {
+      if (!window.confirm(`Delete "${movie.title}"?`)) return;
+      try {
+        await deleteMovie.mutateAsync(movie.id);
+        toast.success("Movie deleted");
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Failed to delete movie",
+        );
+      }
     },
-    [handleEditMovie],
+    [deleteMovie],
   );
-
-  const handleNewFolder = () => {
-    setEditFolder(null);
-    setFolderOpen(true);
-  };
-
-  const handleRenameFolder = (folder: Folder) => {
-    setEditFolder(folder);
-    setFolderOpen(true);
-  };
 
   const currentCategory = CATEGORIES.includes(activeView as Category)
     ? (activeView as Category)
@@ -129,10 +118,6 @@ export default function App() {
           setActiveView(v);
           setSearchQuery("");
         }}
-        folders={folders}
-        onNewFolder={handleNewFolder}
-        onRenameFolder={handleRenameFolder}
-        onDeleteFolder={() => {}}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         isAdmin={isAdmin}
@@ -156,15 +141,12 @@ export default function App() {
           {activeView === "manage" ? (
             <ManagementPanel
               movies={movies}
-              folders={folders}
-              isLoading={moviesLoading || foldersLoading}
+              isLoading={moviesLoading}
               onEditMovie={handleEditMovie}
               onAddMovie={() => {
                 setEditMovie(null);
                 setUploadOpen(true);
               }}
-              onRenameFolder={handleRenameFolder}
-              onAddFolder={handleNewFolder}
               permissions={permissions}
               onSetPermission={setPermission}
             />
@@ -256,7 +238,7 @@ export default function App() {
 
                 <MovieGrid
                   movies={viewMovies}
-                  folders={folders}
+                  folders={[]}
                   activeView={searchQuery ? "all" : activeView}
                   isLoading={moviesLoading}
                   searchQuery={searchQuery}
@@ -287,17 +269,6 @@ export default function App() {
           setEditMovie(null);
         }}
         editMovie={editMovie}
-        folders={folders}
-        defaultCategory={currentCategory}
-      />
-
-      <FolderModal
-        open={folderOpen}
-        onClose={() => {
-          setFolderOpen(false);
-          setEditFolder(null);
-        }}
-        editFolder={editFolder}
         defaultCategory={currentCategory}
       />
 

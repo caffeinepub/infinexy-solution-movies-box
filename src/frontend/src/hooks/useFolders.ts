@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { withRetry } from "../lib/retryBackend";
 import {
   type BackendActor,
   type CandidCategory,
@@ -14,7 +15,7 @@ export function useAllFolders() {
     queryFn: async () => {
       if (!actor) return [];
       const backend = actor as unknown as BackendActor;
-      const result = await backend.getAllFolders();
+      const result = await withRetry(() => backend.getAllFolders());
       return result.map(fromCandidFolder);
     },
     enabled: !!actor && !isFetching,
@@ -27,7 +28,9 @@ export function useAddFolder() {
   return useMutation({
     mutationFn: async (params: { name: string; category: CandidCategory }) => {
       const backend = actor as unknown as BackendActor;
-      const result = await backend.addFolder(params.name, params.category);
+      const result = await withRetry(() =>
+        backend.addFolder(params.name, params.category),
+      );
       return fromCandidFolder(result);
     },
     onSuccess: () => {
@@ -42,7 +45,9 @@ export function useUpdateFolder() {
   return useMutation({
     mutationFn: async (params: { id: bigint; name: string }) => {
       const backend = actor as unknown as BackendActor;
-      const result = await backend.updateFolder(params.id, params.name);
+      const result = await withRetry(() =>
+        backend.updateFolder(params.id, params.name),
+      );
       return result.length > 0 ? fromCandidFolder(result[0]!) : null;
     },
     onSuccess: () => {
@@ -57,7 +62,7 @@ export function useDeleteFolder() {
   return useMutation({
     mutationFn: async (id: bigint) => {
       const backend = actor as unknown as BackendActor;
-      return backend.deleteFolder(id);
+      return withRetry(() => backend.deleteFolder(id));
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["folders"] });

@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -15,23 +16,35 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Image, Loader2, Upload } from "lucide-react";
+import { CheckCircle2, Image, Loader2, Upload, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useBlobUpload } from "../hooks/useBlobUpload";
 import { useAddMovie, useUpdateMovie } from "../hooks/useMovies";
-import {
-  CATEGORIES,
-  type Folder,
-  type Movie,
-  stringToCategory,
-} from "../types";
+import { CATEGORIES, type Movie, stringToCategory } from "../types";
+
+const MAX_FILE_SIZE_BYTES = 40 * 1024 * 1024 * 1024; // 40 GB
+const ACCEPTED_TYPES: Record<string, string> = {
+  "image/jpeg": "JPEG",
+  "image/png": "PNG",
+  "video/x-matroska": "MKV",
+  "video/mp4": "MP4",
+  "video/x-msvideo": "AVI",
+  "video/avi": "AVI",
+};
+const ACCEPTED_EXTENSIONS = ".jpg,.jpeg,.png,.mkv,.mp4,.avi";
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024 * 1024)
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / 1024).toFixed(1)} KB`;
+}
 
 interface UploadModalProps {
   open: boolean;
   onClose: () => void;
   editMovie?: Movie | null;
-  folders: Folder[];
   defaultCategory?: string;
 }
 
@@ -39,7 +52,6 @@ export function UploadModal({
   open,
   onClose,
   editMovie,
-  folders,
   defaultCategory,
 }: UploadModalProps) {
   const isEdit = !!editMovie;
@@ -56,18 +68,21 @@ export function UploadModal({
   const [category, setCategory] = useState(
     editMovie?.category ?? defaultCategory ?? "Bollywood",
   );
-  const [folderId, setFolderId] = useState(
-    editMovie?.folderId && editMovie.folderId.length > 0
-      ? editMovie.folderId[0]!.toString()
-      : "none",
-  );
+  const [uploadedFile, setUploadedFile] = useState<{
+    name: string;
+    size: number;
+    type: string;
+  } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const deviceFileInputRef = useRef<HTMLInputElement>(null);
 
   const addMovie = useAddMovie();
   const updateMovie = useUpdateMovie();
-  const { upload, isUploading, uploadProgress } = useBlobUpload();
+  const posterUpload = useBlobUpload();
+  const deviceUpload = useBlobUpload();
 
-  // Reset form when movie changes
   const resetForm = () => {
     setTitle("");
     setDescription("");
@@ -76,23 +91,69 @@ export function UploadModal({
     setGenre("");
     setYear(String(new Date().getFullYear()));
     setCategory(defaultCategory ?? "Bollywood");
-    setFolderId("none");
+    setUploadedFile(null);
   };
 
   const handlePosterFile = async (file: File) => {
     try {
-      const url = await upload(file);
+      const url = await posterUpload.upload(file);
       setPosterUrl(url);
       toast.success("Poster uploaded");
     } catch {
-      // Fallback to object URL
       const objUrl = URL.createObjectURL(file);
       setPosterUrl(objUrl);
     }
   };
 
-  const categoryFolders = folders.filter((f) => f.category === category);
+  const handleDeviceFile = async (file: File) => {
+    const isAccepted =
+      Object.keys(ACCEPTED_TYPES).includes(file.type) ||
+      /\.(jpg|jpeg|png|mkv|mp4|avi)$/i.test(file.name);
+    if (!isAccepted) {
+      toast.error(
+        "Unsupported file type. Please use JPEG, PNG, MKV, MP4, or AVI.",
+      );
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      toast.error("File too large. Maximum allowed size is 40 GB.");
+      return;
+    }
+
+    setUploadedFile({ name: file.name, size: file.size, type: file.type });
+
+    try {
+      const url = await deviceUpload.upload(file);
+      const isImage =
+        file.type.startsWith("image/") || /\.(jpg|jpeg|png)$/i.test(file.name);
+      if (isImage) {
+        setPosterUrl(url);
+        toast.success("Image uploaded and set as poster.");
+      } else {
+        setVideoLink(url);
+        toast.success("Video uploaded successfully.");
+      }
+    } catch (err) {
+      toast.error(
+        `Upload failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+      );
+      setUploadedFile(null);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleDeviceFile(file);
+  };
+
+  const openDeviceFilePicker = () => {
+    if (!deviceUpload.isUploading) deviceFileInputRef.current?.click();
+  };
+
   const isPending = addMovie.isPending || updateMovie.isPending;
+  const isAnyUploading = posterUpload.isUploading || deviceUpload.isUploading;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,8 +162,6 @@ export function UploadModal({
       return;
     }
     const candid = stringToCategory(category);
-    const folderIdParam: [] | [bigint] =
-      folderId !== "none" ? [BigInt(folderId)] : [];
     try {
       if (isEdit && editMovie) {
         await updateMovie.mutateAsync({
@@ -114,7 +173,7 @@ export function UploadModal({
           genre: genre.trim(),
           year: Number.parseInt(year) || new Date().getFullYear(),
           category: candid,
-          folderId: folderIdParam,
+          folderId: [],
         });
         toast.success("Movie updated!");
       } else {
@@ -126,7 +185,7 @@ export function UploadModal({
           genre: genre.trim(),
           year: Number.parseInt(year) || new Date().getFullYear(),
           category: candid,
-          folderId: folderIdParam,
+          folderId: [],
         });
         toast.success("Movie added!");
         resetForm();
@@ -207,9 +266,9 @@ export function UploadModal({
                   data-ocid="upload.upload_button"
                 >
                   <Image className="w-4 h-4" />
-                  {isUploading
-                    ? `Uploading ${uploadProgress}%…`
-                    : "Upload from device"}
+                  {posterUpload.isUploading
+                    ? `Uploading ${posterUpload.uploadProgress}%…`
+                    : "Upload poster image"}
                 </button>
                 {posterUrl && (
                   <img
@@ -268,58 +327,146 @@ export function UploadModal({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label style={labelStyle}>Category</Label>
-              <Select
-                value={category}
-                onValueChange={(v) => {
-                  setCategory(v);
-                  setFolderId("none");
-                }}
-              >
-                <SelectTrigger
-                  className="mt-1"
-                  style={inputStyle}
-                  data-ocid="upload.select"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent
-                  style={{ background: "#162742", borderColor: "#263A55" }}
-                >
-                  {CATEGORIES.map((c) => (
-                    <SelectItem key={c} value={c} style={{ color: "#E8EEF7" }}>
-                      {c}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label style={labelStyle}>Folder (optional)</Label>
-              <Select value={folderId} onValueChange={setFolderId}>
-                <SelectTrigger className="mt-1" style={inputStyle}>
-                  <SelectValue placeholder="No folder" />
-                </SelectTrigger>
-                <SelectContent
-                  style={{ background: "#162742", borderColor: "#263A55" }}
-                >
-                  <SelectItem value="none" style={{ color: "#AAB6C6" }}>
-                    No folder
-                  </SelectItem>
-                  {categoryFolders.map((f) => (
-                    <SelectItem
-                      key={f.id.toString()}
-                      value={f.id.toString()}
-                      style={{ color: "#E8EEF7" }}
+          {/* Upload from Device */}
+          <div>
+            <Label style={labelStyle} className="flex items-center gap-1">
+              <Upload className="w-3.5 h-3.5" />
+              Upload from Device
+              <span className="ml-1 text-xs" style={{ color: "#5A7298" }}>
+                (JPEG · PNG · MKV · MP4 · AVI · up to 40 GB)
+              </span>
+            </Label>
+
+            <button
+              type="button"
+              className="mt-1 w-full rounded-lg p-4 flex flex-col items-center justify-center gap-2 transition-colors"
+              style={{
+                background: isDragging ? "#162742" : "#0E1A2B",
+                border: `2px dashed ${isDragging ? "#D2B04C" : "#263A55"}`,
+                minHeight: "96px",
+                cursor: deviceUpload.isUploading ? "not-allowed" : "pointer",
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDragging(true);
+              }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={handleDrop}
+              onClick={openDeviceFilePicker}
+              disabled={deviceUpload.isUploading}
+            >
+              {deviceUpload.isUploading ? (
+                <div className="w-full space-y-2 px-2">
+                  <div
+                    className="flex items-center justify-between text-xs"
+                    style={{ color: "#AAB6C6" }}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <Loader2
+                        className="w-3.5 h-3.5 animate-spin"
+                        style={{ color: "#D2B04C" }}
+                      />
+                      {uploadedFile?.name ?? "Uploading…"}
+                    </span>
+                    <span style={{ color: "#D2B04C" }}>
+                      {deviceUpload.uploadProgress}%
+                    </span>
+                  </div>
+                  <Progress
+                    value={deviceUpload.uploadProgress}
+                    className="h-1.5"
+                    style={{ background: "#1A2E47" }}
+                  />
+                  {uploadedFile && (
+                    <p
+                      className="text-xs text-center"
+                      style={{ color: "#5A7298" }}
                     >
-                      {f.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                      {formatBytes(uploadedFile.size)}
+                    </p>
+                  )}
+                </div>
+              ) : uploadedFile ? (
+                <div className="flex flex-col items-center gap-1">
+                  <CheckCircle2
+                    className="w-6 h-6"
+                    style={{ color: "#4CAF50" }}
+                  />
+                  <p
+                    className="text-xs font-medium"
+                    style={{ color: "#E8EEF7" }}
+                  >
+                    {uploadedFile.name}
+                  </p>
+                  <p className="text-xs" style={{ color: "#5A7298" }}>
+                    {formatBytes(uploadedFile.size)}
+                  </p>
+                  <button
+                    type="button"
+                    className="mt-1 flex items-center gap-1 text-xs px-2 py-0.5 rounded"
+                    style={{
+                      color: "#AAB6C6",
+                      background: "#162742",
+                      border: "1px solid #263A55",
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setUploadedFile(null);
+                    }}
+                  >
+                    <X className="w-3 h-3" /> Remove
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <Upload className="w-7 h-7" style={{ color: "#D2B04C" }} />
+                  <p
+                    className="text-sm font-medium"
+                    style={{ color: "#AAB6C6" }}
+                  >
+                    {isDragging
+                      ? "Drop file here"
+                      : "Click or drag & drop to upload"}
+                  </p>
+                  <p className="text-xs" style={{ color: "#5A7298" }}>
+                    Supports JPEG, PNG, MKV, MP4, AVI — max 40 GB
+                  </p>
+                </>
+              )}
+            </button>
+
+            <input
+              ref={deviceFileInputRef}
+              type="file"
+              accept={ACCEPTED_EXTENSIONS}
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files?.[0]) handleDeviceFile(e.target.files[0]);
+                e.target.value = "";
+              }}
+            />
+          </div>
+
+          <div>
+            <Label style={labelStyle}>Category</Label>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger
+                className="mt-1"
+                style={inputStyle}
+                data-ocid="upload.select"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent
+                style={{ background: "#162742", borderColor: "#263A55" }}
+              >
+                {CATEGORIES.map((c) => (
+                  <SelectItem key={c} value={c} style={{ color: "#E8EEF7" }}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex gap-3 pt-2">
@@ -339,7 +486,7 @@ export function UploadModal({
             </Button>
             <Button
               type="submit"
-              disabled={isPending || isUploading}
+              disabled={isPending || isAnyUploading}
               className="flex-1 font-bold uppercase text-xs tracking-wider"
               style={{ background: "#D2B04C", color: "#0B1220" }}
               data-ocid="upload.submit_button"

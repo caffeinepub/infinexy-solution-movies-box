@@ -1,28 +1,14 @@
-import {
-  Edit2,
-  Film,
-  Folder,
-  FolderPlus,
-  Grid,
-  Settings,
-  Trash2,
-  X,
-} from "lucide-react";
+import { Film, Grid, Settings, X } from "lucide-react";
 import {
   CATEGORIES,
   CATEGORY_COLORS,
   type Category,
-  type Folder as FolderType,
   type NavView,
 } from "../types";
 
 interface SidebarProps {
   activeView: NavView;
   onViewChange: (view: NavView) => void;
-  folders: FolderType[];
-  onNewFolder: () => void;
-  onRenameFolder: (folder: FolderType) => void;
-  onDeleteFolder: (folder: FolderType) => void;
   isOpen: boolean;
   onClose: () => void;
   isAdmin: boolean;
@@ -31,22 +17,10 @@ interface SidebarProps {
 export function Sidebar({
   activeView,
   onViewChange,
-  folders,
-  onNewFolder,
-  onRenameFolder,
-  onDeleteFolder,
   isOpen,
   onClose,
   isAdmin,
 }: SidebarProps) {
-  const activeCategory = CATEGORIES.includes(activeView as Category)
-    ? (activeView as Category)
-    : null;
-
-  const categoryFolders = activeCategory
-    ? folders.filter((f) => f.category === activeCategory)
-    : [];
-
   const navItem = (view: NavView, label: string, icon?: React.ReactNode) => {
     const isActive = activeView === view;
     return (
@@ -149,77 +123,6 @@ export function Sidebar({
               )}
             </div>
           </div>
-
-          {/* Folders for active category */}
-          {activeCategory && (
-            <div>
-              <p
-                className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-widest"
-                style={{ color: "#7F8CA3" }}
-              >
-                Folders
-              </p>
-              <div className="space-y-0.5">
-                {categoryFolders.length === 0 && (
-                  <p
-                    className="px-3 py-1.5 text-xs"
-                    style={{ color: "#7F8CA3" }}
-                  >
-                    No folders yet
-                  </p>
-                )}
-                {categoryFolders.map((folder) => (
-                  <div
-                    key={folder.id.toString()}
-                    className="group flex items-center gap-2 px-3 py-2 rounded-lg text-sm"
-                    style={{ color: "#AAB6C6" }}
-                  >
-                    <Folder
-                      className="w-4 h-4 shrink-0"
-                      style={{ color: "#7F8CA3" }}
-                    />
-                    <span className="flex-1 truncate text-sm">
-                      {folder.name}
-                    </span>
-                    {isAdmin && (
-                      <div className="hidden group-hover:flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => onRenameFolder(folder)}
-                          className="p-1 rounded hover:text-[#D2B04C] transition-colors"
-                          title="Rename folder"
-                          data-ocid="folders.edit_button"
-                        >
-                          <Edit2 className="w-3 h-3" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onDeleteFolder(folder)}
-                          className="p-1 rounded hover:text-[#B53A3A] transition-colors"
-                          title="Delete folder"
-                          data-ocid="folders.delete_button"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {isAdmin && (
-                  <button
-                    type="button"
-                    onClick={onNewFolder}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all hover:bg-white/5"
-                    style={{ color: "#7F8CA3" }}
-                    data-ocid="folders.add_button"
-                  >
-                    <FolderPlus className="w-4 h-4" />
-                    <span>New Folder</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* Manage — admin only */}
           {isAdmin && (

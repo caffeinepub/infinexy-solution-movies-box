@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { withRetry } from "../lib/retryBackend";
 import {
   type BackendActor,
   type CandidCategory,
@@ -14,7 +15,7 @@ export function useAllMovies() {
     queryFn: async () => {
       if (!actor) return [];
       const backend = actor as unknown as BackendActor;
-      const result = await backend.getAllMovies();
+      const result = await withRetry(() => backend.getAllMovies());
       return result.map(fromCandidMovie);
     },
     enabled: !!actor && !isFetching,
@@ -28,7 +29,7 @@ export function useSearchMovies(query: string) {
     queryFn: async () => {
       if (!actor || !query.trim()) return [];
       const backend = actor as unknown as BackendActor;
-      const result = await backend.searchMovies(query);
+      const result = await withRetry(() => backend.searchMovies(query));
       return result.map(fromCandidMovie);
     },
     enabled: !!actor && !isFetching && query.trim().length > 0,
@@ -50,15 +51,17 @@ export function useAddMovie() {
       folderId: [] | [bigint];
     }) => {
       const backend = actor as unknown as BackendActor;
-      const movie = await backend.addMovie(
-        params.title,
-        params.description,
-        params.posterUrl,
-        params.videoLink,
-        params.genre,
-        BigInt(params.year),
-        params.category,
-        params.folderId,
+      const movie = await withRetry(() =>
+        backend.addMovie(
+          params.title,
+          params.description,
+          params.posterUrl,
+          params.videoLink,
+          params.genre,
+          BigInt(params.year),
+          params.category,
+          params.folderId,
+        ),
       );
       return fromCandidMovie(movie);
     },
@@ -84,16 +87,18 @@ export function useUpdateMovie() {
       folderId: [] | [bigint];
     }) => {
       const backend = actor as unknown as BackendActor;
-      const result = await backend.updateMovie(
-        params.id,
-        params.title,
-        params.description,
-        params.posterUrl,
-        params.videoLink,
-        params.genre,
-        BigInt(params.year),
-        params.category,
-        params.folderId,
+      const result = await withRetry(() =>
+        backend.updateMovie(
+          params.id,
+          params.title,
+          params.description,
+          params.posterUrl,
+          params.videoLink,
+          params.genre,
+          BigInt(params.year),
+          params.category,
+          params.folderId,
+        ),
       );
       return result.length > 0 ? fromCandidMovie(result[0]!) : null;
     },
@@ -109,7 +114,7 @@ export function useDeleteMovie() {
   return useMutation({
     mutationFn: async (id: bigint) => {
       const backend = actor as unknown as BackendActor;
-      return backend.deleteMovie(id);
+      return withRetry(() => backend.deleteMovie(id));
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["movies"] });
@@ -187,15 +192,17 @@ export function useSeedMovies() {
       ];
       await Promise.all(
         seed.map((m) =>
-          backend.addMovie(
-            m.title,
-            m.description,
-            m.posterUrl,
-            m.videoLink,
-            m.genre,
-            BigInt(m.year),
-            m.category,
-            [],
+          withRetry(() =>
+            backend.addMovie(
+              m.title,
+              m.description,
+              m.posterUrl,
+              m.videoLink,
+              m.genre,
+              BigInt(m.year),
+              m.category,
+              [],
+            ),
           ),
         ),
       );
